@@ -27,7 +27,7 @@ import io.flutter.plugin.common.PluginRegistry;
 /**
  * FlutterWebviewPlugin
  */
-public class FlutterWebviewPlugin implements FlutterPlugin, ActivityAware, MethodCallHandler, PluginRegistry.ActivityResultListener {
+public class FlutterWebviewPlugin implements FlutterPlugin, ActivityAware, MethodCallHandler, PluginRegistry.ActivityResultListener, PluginRegistry.RequestPermissionsResultListener {
     private Activity activity;
     private WebviewManager webViewManager;
     private Context context;
@@ -40,6 +40,7 @@ public class FlutterWebviewPlugin implements FlutterPlugin, ActivityAware, Metho
             channel = new MethodChannel(registrar.messenger(), CHANNEL_NAME);
             final FlutterWebviewPlugin instance = new FlutterWebviewPlugin(registrar.activity(), registrar.activeContext());
             registrar.addActivityResultListener(instance);
+            registrar.addRequestPermissionsResultListener(instance);
             channel.setMethodCallHandler(instance);
         }
     }
@@ -118,6 +119,7 @@ public class FlutterWebviewPlugin implements FlutterPlugin, ActivityAware, Metho
         boolean withJavascript = call.argument("withJavascript");
         boolean clearCache = call.argument("clearCache");
         boolean clearCookies = call.argument("clearCookies");
+        ArrayList<String> cookies = call.argument("cookies");
         boolean mediaPlaybackRequiresUserGesture = call.argument("mediaPlaybackRequiresUserGesture");
         boolean withZoom = call.argument("withZoom");
         boolean displayZoomControls = call.argument("displayZoomControls");
@@ -151,6 +153,7 @@ public class FlutterWebviewPlugin implements FlutterPlugin, ActivityAware, Metho
                 clearCache,
                 hidden,
                 clearCookies,
+                cookies,
                 mediaPlaybackRequiresUserGesture,
                 userAgent,
                 url,
@@ -365,5 +368,13 @@ public class FlutterWebviewPlugin implements FlutterPlugin, ActivityAware, Metho
     @Override
     public void onDetachedFromActivity() {
 
+	}
+
+	@Override
+    public boolean onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        if (webViewManager != null && webViewManager.resultHandler != null) {
+            return webViewManager.resultHandler.handlePermissionsResult(requestCode, permissions, grantResults);
+        }
+        return false;
     }
 }
