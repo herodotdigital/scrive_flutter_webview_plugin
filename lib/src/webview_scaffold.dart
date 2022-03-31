@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -17,6 +18,7 @@ class WebviewScaffold extends StatefulWidget {
     this.withJavascript = true,
     this.clearCache = false,
     this.clearCookies = false,
+    this.cookies = [],
     this.mediaPlaybackRequiresUserGesture = true,
     this.enableAppScheme = true,
     this.userAgent,
@@ -50,6 +52,7 @@ class WebviewScaffold extends StatefulWidget {
   final bool withJavascript;
   final bool clearCache;
   final bool clearCookies;
+  final List<Cookie> cookies;
   final bool mediaPlaybackRequiresUserGesture;
   final bool enableAppScheme;
   final String? userAgent;
@@ -160,6 +163,7 @@ class _WebviewScaffoldState extends State<WebviewScaffold> {
               withJavascript: widget.withJavascript,
               clearCache: widget.clearCache,
               clearCookies: widget.clearCookies,
+              cookies: widget.cookies,
               mediaPlaybackRequiresUserGesture:
                   widget.mediaPlaybackRequiresUserGesture,
               hidden: widget.hidden,

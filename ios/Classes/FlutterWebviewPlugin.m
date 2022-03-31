@@ -85,6 +85,7 @@ static NSString *const CHANNEL_NAME = @"flutter_webview_plugin";
 }
 
 - (void)initWebview:(FlutterMethodCall*)call withResult:(FlutterResult)result {
+    NSString *url = call.arguments[@"url"];
     NSNumber *clearCache = call.arguments[@"clearCache"];
     NSNumber *clearCookies = call.arguments[@"clearCookies"];
     NSNumber *hidden = call.arguments[@"hidden"];
@@ -92,11 +93,13 @@ static NSString *const CHANNEL_NAME = @"flutter_webview_plugin";
     _enableAppScheme = call.arguments[@"enableAppScheme"];
     NSString *userAgent = call.arguments[@"userAgent"];
     NSNumber *withZoom = call.arguments[@"withZoom"];
+    NSArray *cookies = call.arguments[@"cookies"];
     NSNumber *scrollBar = call.arguments[@"scrollBar"];
     NSNumber *withJavascript = call.arguments[@"withJavascript"];
     _invalidUrlRegex = call.arguments[@"invalidUrlRegex"];
     _ignoreSSLErrors = call.arguments[@"ignoreSSLErrors"];
     _javaScriptChannelNames = [[NSMutableSet alloc] init];
+    currentUrl = nil;
     
     WKUserContentController* userContentController = [[WKUserContentController alloc] init];
     if ([call.arguments[@"javascriptChannelNames"] isKindOfClass:[NSArray class]]) {
@@ -135,30 +138,52 @@ static NSString *const CHANNEL_NAME = @"flutter_webview_plugin";
 
     WKWebViewConfiguration* configuration = [[WKWebViewConfiguration alloc] init];
     configuration.userContentController = userContentController;
-    self.webview = [[WKWebView alloc] initWithFrame:rc configuration:configuration];
-    self.webview.UIDelegate = self;
-    self.webview.navigationDelegate = self;
-    self.webview.scrollView.delegate = self;
-    self.webview.hidden = [hidden boolValue];
-    self.webview.scrollView.showsHorizontalScrollIndicator = [scrollBar boolValue];
-    self.webview.scrollView.showsVerticalScrollIndicator = [scrollBar boolValue];
-    
-    [self.webview addObserver:self forKeyPath:@"estimatedProgress" options:NSKeyValueObservingOptionNew context:NULL];
+    WKWebsiteDataStore* store = [WKWebsiteDataStore nonPersistentDataStore];
 
-    WKPreferences* preferences = [[self.webview configuration] preferences];
-    if ([withJavascript boolValue]) {
-        [preferences setJavaScriptEnabled:YES];
-    } else {
-        [preferences setJavaScriptEnabled:NO];
+    dispatch_group_t group = dispatch_group_create();
+
+    if (cookies != nil) {
+        NSURL* parsedUrl = [NSURL URLWithString:url];
+        NSString* cookieString = [cookies componentsJoinedByString: @", "];
+        NSDictionary* fakeHeaders = @{@"Set-Cookie": cookieString};
+        NSArray* cookies = [NSHTTPCookie cookiesWithResponseHeaderFields:fakeHeaders forURL:parsedUrl];
+
+        for(NSHTTPCookie *cookie in cookies) {
+            dispatch_group_enter(group);
+            [store.httpCookieStore setCookie:cookie completionHandler:^{
+                dispatch_group_leave(group);
+            }];
+        };
     }
 
-    _enableZoom = [withZoom boolValue];
+    dispatch_group_notify(group, dispatch_get_main_queue(), ^{
+        configuration.websiteDataStore = store;
 
-    UIViewController* presentedViewController = self.viewController.presentedViewController;
-    UIViewController* currentViewController = presentedViewController != nil ? presentedViewController : self.viewController;
-    [currentViewController.view addSubview:self.webview];
+        self.webview = [[WKWebView alloc] initWithFrame:rc configuration:configuration];
+        self.webview.UIDelegate = self;
+        self.webview.navigationDelegate = self;
+        self.webview.scrollView.delegate = self;
+        self.webview.hidden = [hidden boolValue];
+        self.webview.scrollView.showsHorizontalScrollIndicator = [scrollBar boolValue];
+        self.webview.scrollView.showsVerticalScrollIndicator = [scrollBar boolValue];
+    
+        [self.webview addObserver:self forKeyPath:@"estimatedProgress" options:NSKeyValueObservingOptionNew context:NULL];
 
-    [self navigate:call];
+        WKPreferences* preferences = [[self.webview configuration] preferences];
+        if ([withJavascript boolValue]) {
+            [preferences setJavaScriptEnabled:YES];
+        } else {
+            [preferences setJavaScriptEnabled:NO];
+        }
+
+        _enableZoom = [withZoom boolValue];
+
+        UIViewController* presentedViewController = self.viewController.presentedViewController;
+        UIViewController* currentViewController = presentedViewController != nil ? presentedViewController : self.viewController;
+        [currentViewController.view addSubview:self.webview];
+
+        [self navigate:call];
+    });
 }
 
 - (void)webView:(WKWebView *)webView didReceiveAuthenticationChallenge:(NSURLAuthenticationChallenge *)challenge completionHandler:(void (^)(NSURLSessionAuthChallengeDisposition disposition, NSURLCredential *credential))completionHandler {
@@ -258,7 +283,7 @@ static NSString *const CHANNEL_NAME = @"flutter_webview_plugin";
         self.webview.navigationDelegate = nil;
         [self.webview removeObserver:self forKeyPath:@"estimatedProgress"];
         self.webview = nil;
-
+        currentUrl = nil;
         // manually trigger onDestroy
         [channel invokeMethod:@"onDestroy" arguments:nil];
     }
@@ -266,8 +291,8 @@ static NSString *const CHANNEL_NAME = @"flutter_webview_plugin";
 
 - (void)reloadUrl:(FlutterMethodCall*)call {
     if (self.webview != nil) {
-		NSString *url = call.arguments[@"url"];
-		NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:url]];
+        NSString *url = call.arguments[@"url"];
+        NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:url]];
         NSDictionary *headers = call.arguments[@"headers"];
         
         if (headers != nil) {
@@ -381,22 +406,29 @@ static NSString *const CHANNEL_NAME = @"flutter_webview_plugin";
   }
 }
 
+NSString* currentUrl;
+
 #pragma mark -- WkWebView Delegate
 - (void)webView:(WKWebView *)webView decidePolicyForNavigationAction:(WKNavigationAction *)navigationAction
     decisionHandler:(void (^)(WKNavigationActionPolicy))decisionHandler {
+
 
     BOOL isInvalid = [self checkInvalidUrl: navigationAction.request.URL];
     
     id data = @{@"url": navigationAction.request.URL.absoluteString,
                 @"type": isInvalid ? @"abortLoad" : @"shouldStart",
                 @"navigationType": [NSNumber numberWithInteger:navigationAction.navigationType]};
-    [channel invokeMethod:@"onState" arguments:data];
+
+    if (currentUrl != nil) {
+     [channel invokeMethod:@"onState" arguments:data];
+    }
 
     if (navigationAction.navigationType == WKNavigationTypeBackForward) {
         [channel invokeMethod:@"onBackPressed" arguments:nil];
     } else if (!isInvalid) {
         id data = @{@"url": navigationAction.request.URL.absoluteString};
         [channel invokeMethod:@"onUrlChanged" arguments:data];
+        currentUrl = navigationAction.request.URL.absoluteString;
     }
 
     if (_enableAppScheme ||

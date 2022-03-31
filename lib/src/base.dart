@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -114,6 +115,7 @@ class FlutterWebviewPlugin {
   /// - [withJavascript] enable Javascript or not for the Webview
   /// - [clearCache] clear the cache of the Webview
   /// - [clearCookies] clear all cookies of the Webview
+  /// - [cookies] An initial list of cookies to populate the Webview's cookiejar
   /// - [hidden] not show
   /// - [rect]: show in rect, fullscreen if null
   /// - [enableAppScheme]: false will enable all schemes, true only for httt/https/about
@@ -146,6 +148,7 @@ class FlutterWebviewPlugin {
     bool withJavascript = true,
     bool clearCache = false,
     bool clearCookies = false,
+    List<Cookie> cookies = const <Cookie>[],
     bool mediaPlaybackRequiresUserGesture = true,
     bool hidden = false,
     bool enableAppScheme = true,
@@ -167,12 +170,15 @@ class FlutterWebviewPlugin {
     bool debuggingEnabled = false,
     bool ignoreSSLErrors = false,
   }) async {
+    final List<String> serializedCookies = cookies.map((cookie) => cookie.toString()).toList();
+
     final args = <String, dynamic>{
       'url': url,
       'withJavascript': withJavascript,
       'clearCache': clearCache,
       'hidden': hidden,
       'clearCookies': clearCookies,
+      'cookies': serializedCookies,
       'mediaPlaybackRequiresUserGesture': mediaPlaybackRequiresUserGesture,
       'enableAppScheme': enableAppScheme,
       'userAgent': userAgent,
