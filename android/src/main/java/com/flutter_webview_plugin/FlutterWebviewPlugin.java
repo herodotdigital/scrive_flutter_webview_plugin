@@ -24,7 +24,7 @@ import io.flutter.plugin.common.PluginRegistry;
 /**
  * FlutterWebviewPlugin
  */
-public class FlutterWebviewPlugin implements MethodCallHandler, PluginRegistry.ActivityResultListener {
+public class FlutterWebviewPlugin implements MethodCallHandler, PluginRegistry.ActivityResultListener, PluginRegistry.RequestPermissionsResultListener {
     private Activity activity;
     private WebviewManager webViewManager;
     private Context context;
@@ -37,6 +37,7 @@ public class FlutterWebviewPlugin implements MethodCallHandler, PluginRegistry.A
             channel = new MethodChannel(registrar.messenger(), CHANNEL_NAME);
             final FlutterWebviewPlugin instance = new FlutterWebviewPlugin(registrar.activity(), registrar.activeContext());
             registrar.addActivityResultListener(instance);
+            registrar.addRequestPermissionsResultListener(instance);
             channel.setMethodCallHandler(instance);
         }
     }
@@ -113,6 +114,7 @@ public class FlutterWebviewPlugin implements MethodCallHandler, PluginRegistry.A
         boolean withJavascript = call.argument("withJavascript");
         boolean clearCache = call.argument("clearCache");
         boolean clearCookies = call.argument("clearCookies");
+        ArrayList<String> cookies = call.argument("cookies");
         boolean mediaPlaybackRequiresUserGesture = call.argument("mediaPlaybackRequiresUserGesture");
         boolean withZoom = call.argument("withZoom");
         boolean displayZoomControls = call.argument("displayZoomControls");
@@ -146,6 +148,7 @@ public class FlutterWebviewPlugin implements MethodCallHandler, PluginRegistry.A
                 clearCache,
                 hidden,
                 clearCookies,
+                cookies,
                 mediaPlaybackRequiresUserGesture,
                 userAgent,
                 url,
@@ -321,6 +324,14 @@ public class FlutterWebviewPlugin implements MethodCallHandler, PluginRegistry.A
     public boolean onActivityResult(int i, int i1, Intent intent) {
         if (webViewManager != null && webViewManager.resultHandler != null) {
             return webViewManager.resultHandler.handleResult(i, i1, intent);
+        }
+        return false;
+    }
+
+    @Override
+    public boolean onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        if (webViewManager != null && webViewManager.resultHandler != null) {
+            return webViewManager.resultHandler.handlePermissionsResult(requestCode, permissions, grantResults);
         }
         return false;
     }
