@@ -18,7 +18,7 @@ class WebviewScaffold extends StatefulWidget {
     this.withJavascript = true,
     this.clearCache = false,
     this.clearCookies = false,
-    this.cookies = [],
+    this.cookies = const [],
     this.mediaPlaybackRequiresUserGesture = true,
     this.enableAppScheme = true,
     this.userAgent,
