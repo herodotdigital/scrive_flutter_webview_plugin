@@ -20,7 +20,7 @@ buildscript {
     }
 
     dependencies {
-        classpath 'com.android.tools.build:gradle:3.5.3'
+        classpath 'com.android.tools.build:gradle:3.5.4'
     }
 }
 
@@ -53,10 +53,10 @@ android {
     }
 }
 dependencies {
-    implementation 'androidx.appcompat:appcompat:1.1.0'
+    implementation 'androidx.appcompat:appcompat:1.4.2'
 
-	testImplementation 'junit:junit:4.12'
-    testImplementation 'androidx.test:core:1.2.0'
+	testImplementation 'junit:junit:4.13.2'
+    testImplementation 'androidx.test:core:1.4.0'
 
 //    When running unit tests for project, gradle needs to have flutter.jar in path
 //    since there's no FLUTTER_HOME variable, we need to pass flutterPath from console with command:
